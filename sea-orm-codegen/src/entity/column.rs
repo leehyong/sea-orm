@@ -28,6 +28,14 @@ impl Column {
     }
 
     pub fn get_rs_type(&self, date_time_crate: &DateTimeCrate) -> TokenStream {
+        let ident = self.get_rs_type_no_option(date_time_crate);
+        match self.not_null {
+            true => quote! { #ident },
+            false => quote! { Option<#ident> },
+        }
+    }
+    
+    pub fn get_rs_type_no_option(&self, date_time_crate: &DateTimeCrate) -> TokenStream {
         fn write_rs_type(col_type: &ColumnType, date_time_crate: &DateTimeCrate) -> String {
             #[allow(unreachable_patterns)]
             match col_type {
@@ -90,10 +98,7 @@ impl Column {
         let ident: TokenStream = write_rs_type(&self.col_type, date_time_crate)
             .parse()
             .unwrap();
-        match self.not_null {
-            true => quote! { #ident },
-            false => quote! { Option<#ident> },
-        }
+        quote! { #ident }
     }
 
     pub fn get_col_type_attrs(&self) -> Option<TokenStream> {

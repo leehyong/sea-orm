@@ -217,6 +217,13 @@ pub enum GenerateSubcommands {
             help = "Entity file output directory"
         )]
         output_dir: String,
+        
+        #[arg(
+            long,
+            default_value = "",
+            help = "protocol buffer message file output directory"
+        )]
+        proto_dir: String,
 
         #[arg(
             short = 's',

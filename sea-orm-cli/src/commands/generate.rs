@@ -3,10 +3,11 @@ use sea_orm_codegen::{
     DateTimeCrate as CodegenDateTimeCrate, EntityTransformer, EntityWriterContext, OutputFile,
     WithPrelude, WithSerde,
 };
+use std::io::Read;
 use std::{error::Error, fs, io::Write, path::Path, process::Command, str::FromStr};
 use tracing_subscriber::{prelude::*, EnvFilter};
 use url::Url;
-
+use std::collections::HashMap;
 use crate::{DateTimeCrate, GenerateSubcommands};
 
 pub async fn run_generate_command(
@@ -23,6 +24,7 @@ pub async fn run_generate_command(
             max_connections,
             acquire_timeout,
             output_dir,
+            proto_dir,
             database_schema,
             database_url,
             with_prelude,
@@ -210,12 +212,46 @@ pub async fn run_generate_command(
                 seaography,
                 impl_active_model_behavior,
             );
-            let output = EntityTransformer::transform(table_stmts)?.generate(&writer_context);
+            let entity_writer = EntityTransformer::transform(table_stmts)?;
 
+            if !proto_dir.is_empty(){
+                let dir = Path::new(&proto_dir);
+                fs::create_dir_all(dir)?;
+                // 通过 这个json 文件以保证 生成的proto文件的字段值不变化
+                let meta_json_file_path = dir.join("generated.meta.json");
+                // 打开文件
+                
+                // 创建一个字符串变量来存储文件内容
+                let mut contents = String::new();
+                if fs::exists(&meta_json_file_path).unwrap(){
+                    let mut file = fs::File::open(&meta_json_file_path)?;
+                    file.read_to_string(&mut contents)?;
+                }
+                // 读取文件内容到字符串
+                let mut meta:HashMap<String, HashMap<String, usize>>;
+                if contents.is_empty(){
+                    meta = HashMap::new();
+                }else{
+                    meta = serde_json::from_str(contents.as_str()).unwrap();
+                }
+                let output = entity_writer.generate_proto(&writer_context, &mut meta);
+                for OutputFile { name, content } in output.files.iter(){
+                    let file_path = dir.join(name);
+                    println!("Writing {}", file_path.display());
+                    let mut file = fs::File::create(file_path)?;
+                    file.write_all(content.as_bytes())?;
+                }
+                if !meta.is_empty(){
+                    let mut file = fs::File::create(meta_json_file_path)?;
+                    file.write_all(serde_json::to_string(&meta).unwrap().as_bytes())?;
+                }
+            }
+            let output = entity_writer.generate(&writer_context);
             let dir = Path::new(&output_dir);
             fs::create_dir_all(dir)?;
 
-            for OutputFile { name, content } in output.files.iter() {
+            
+            for OutputFile { name, content } in output.files.iter(){
                 let file_path = dir.join(name);
                 println!("Writing {}", file_path.display());
                 let mut file = fs::File::create(file_path)?;
@@ -230,6 +266,8 @@ pub async fn run_generate_command(
                     return Err(format!("Fail to format file `{name}`").into());
                 }
             }
+
+            
 
             println!("... Done.");
         }

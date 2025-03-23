@@ -2,6 +2,7 @@ use crate::{util::escape_rust_keyword, ActiveEnum, Entity};
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use std::collections::HashMap;
 use std::{collections::BTreeMap, str::FromStr};
 use syn::{punctuated::Punctuated, token::Comma};
 use tracing::info;
@@ -215,6 +216,64 @@ impl EntityWriter {
                 &context.enum_extra_attributes,
             ));
         }
+        WriterOutput { files }
+    }
+    
+    pub fn generate_proto(&self, context: &EntityWriterContext, meta:&mut HashMap<String, HashMap<String, usize>>) -> WriterOutput {
+        let mut files = Vec::new();
+        let mut lines = Vec::with_capacity(1024);
+        lines.push(r##"syntax = "proto3";"##.to_owned());
+        lines.push(r##"package proto.sea_orm_generate_table;"##.to_owned());
+        lines.push("\n".to_string());
+        let rust2proto_types_map:HashMap<&str, &str> = HashMap::from_iter(vec![
+            ("f64", "double"),
+            ("f32", "float"),
+            ("i32", "int32"),
+            ("i64", "int64"),
+            ("u32", "uint32"),
+            ("u64", "uint64"),
+            ("i32", "sint32"),
+            ("i64", "sint64"),
+            ("u32", "fixed32"),
+            ("u64", "fixed64"),
+            ("i32", "sfixed32"),
+            ("i64", "sfixed64"),
+            ("bool", "bool"),
+            ("String", "string"),
+            ("DateTimeWithTimeZone", "string"),
+        ]);
+
+        self.entities
+        .iter()
+        .map(|entity| {
+            let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
+            let msg_name = entity.get_table_name_camel_case();
+            entity_msg_lines.push(format!("message {msg_name}{{"));
+            let entity_meta = meta.entry(msg_name.clone()).or_default();
+            entity_msg_lines.extend(entity.columns.iter().enumerate().filter_map(|(idx,col)|{
+                let col_type = col.get_rs_type_no_option(&context.date_time_crate).to_string().replace(' ', "");
+                let proto_idx = entity_meta.entry(col.name.clone()).or_insert(idx + 1);
+                if col_type.starts_with("Vec<") {
+                    Some(format!("    bytes {} = {};", col.name, *proto_idx))
+                }else{
+                    match rust2proto_types_map.get(col_type.as_str()) {
+                        Some(proto_type) => Some(format!("    {proto_type} {} = {};", col.name, *proto_idx)),
+                        None => {
+                            eprintln!("不支持的类型{col_type}");
+                            None
+                        }
+                    }
+                }
+            }));
+            entity_msg_lines.push(format!("}}\n"));
+            entity_msg_lines
+        }).for_each(|entity_lines|{
+            lines.extend(entity_lines);
+        });
+        files.push(OutputFile {
+            name: "generate_sea_orm.proto".to_string(),
+            content: lines.join("\n"),
+        });
         WriterOutput { files }
     }
 
