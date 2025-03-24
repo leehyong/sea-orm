@@ -218,14 +218,18 @@ impl EntityWriter {
         }
         WriterOutput { files }
     }
-    
-    pub fn generate_proto(&self, context: &EntityWriterContext, meta:&mut HashMap<String, HashMap<String, usize>>) -> WriterOutput {
+
+    pub fn generate_proto(
+        &self,
+        context: &EntityWriterContext,
+        meta: &mut HashMap<String, HashMap<String, usize>>,
+    ) -> WriterOutput {
         let mut files = Vec::new();
         let mut lines = Vec::with_capacity(1024);
         lines.push(r##"syntax = "proto3";"##.to_owned());
         lines.push(r##"package proto.sea_orm_generate_table;"##.to_owned());
         lines.push("\n".to_string());
-        let rust2proto_types_map:HashMap<&str, &str> = HashMap::from_iter(vec![
+        let rust2proto_types_map: HashMap<&str, &str> = HashMap::from_iter(vec![
             ("f64", "double"),
             ("f32", "float"),
             ("i32", "int32"),
@@ -244,32 +248,66 @@ impl EntityWriter {
         ]);
 
         self.entities
-        .iter()
-        .map(|entity| {
-            let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
-            let msg_name = entity.get_table_name_camel_case();
-            entity_msg_lines.push(format!("message {msg_name}{{"));
-            let entity_meta = meta.entry(msg_name.clone()).or_default();
-            entity_msg_lines.extend(entity.columns.iter().enumerate().filter_map(|(idx,col)|{
-                let col_type = col.get_rs_type_no_option(&context.date_time_crate).to_string().replace(' ', "");
-                let proto_idx = entity_meta.entry(col.name.clone()).or_insert(idx + 1);
-                if col_type.starts_with("Vec<") {
-                    Some(format!("    bytes {} = {};", col.name, *proto_idx))
-                }else{
-                    match rust2proto_types_map.get(col_type.as_str()) {
-                        Some(proto_type) => Some(format!("    {proto_type} {} = {};", col.name, *proto_idx)),
-                        None => {
-                            eprintln!("不支持的类型{col_type}");
-                            None
-                        }
-                    }
+            .iter()
+            .map(|entity| {
+                let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
+                let msg_name = entity.get_table_name_camel_case();
+                let mut all_msgs = vec![msg_name.clone()];
+                if entity.columns.iter().find(|col| col.name == "id").is_some() {
+                    // 如存在ID列，则此数据库表可以额外创建新增、修改两个message
+                    all_msgs.extend([format!("New{msg_name}"), format!("Update{msg_name}")]);
                 }
-            }));
-            entity_msg_lines.push(format!("}}\n"));
-            entity_msg_lines
-        }).for_each(|entity_lines|{
-            lines.extend(entity_lines);
-        });
+                for msg in all_msgs {
+                    entity_msg_lines.push(format!("message {msg}{{"));
+                    let entity_meta = meta.entry(msg.clone()).or_default();
+                    entity_msg_lines.extend(entity.columns.iter().enumerate().filter_map(
+                        |(idx, col)| {
+                            let col_type = col
+                                .get_rs_type_no_option(&context.date_time_crate)
+                                .to_string()
+                                .replace(' ', "");
+
+                            if col_type.starts_with("DateTime")
+                            {
+                                if (msg.starts_with("New") || msg.starts_with("Update"))
+                                    && (col.name == "created_at"
+                                    || col.name == "updated_at"
+                                    || col.name == "deleted_at"){
+                                    // 这几个字段不需要写到proto文件中
+                                    return None;
+                                } else if col.name == "deleted_at" {
+                                    // 这个字段不需要写到proto文件中
+                                    return None;
+                                }
+                            }
+                            // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户
+                            if col.name == "creator" ||  col.name == "editor" ||  col.name == "editor_id"{
+                                return None;
+                            }
+                            let proto_idx = entity_meta.entry(col.name.clone()).or_insert(idx + 1);
+                            if col_type.starts_with("Vec<") {
+                                Some(format!("    bytes {} = {};", col.name, *proto_idx))
+                            } else {
+                                match rust2proto_types_map.get(col_type.as_str()) {
+                                    Some(proto_type) => Some(format!(
+                                        "    {proto_type} {} = {};",
+                                        col.name, *proto_idx
+                                    )),
+                                    None => {
+                                        eprintln!("不支持的类型{col_type}");
+                                        None
+                                    }
+                                }
+                            }
+                        },
+                    ));
+                    entity_msg_lines.push(format!("}}\n"));
+                }
+                entity_msg_lines
+            })
+            .for_each(|entity_lines| {
+                lines.extend(entity_lines);
+            });
         files.push(OutputFile {
             name: "generate_sea_orm.proto".to_string(),
             content: lines.join("\n"),

@@ -3170,6 +3170,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pgvector"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0e8871b6d7ca78348c6cd29b911b94851f3429f0cd403130ca17f26c1fb91a6"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "phf"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4056,15 +4065,16 @@ dependencies = [
 
 [[package]]
 name = "sea-orm"
-version = "1.1.5"
+version = "1.1.7"
 dependencies = [
  "async-stream",
  "async-trait",
  "bigdecimal",
  "chrono",
- "futures",
+ "futures-util",
  "log",
  "ouroboros",
+ "pgvector",
  "rust_decimal",
  "sea-orm-macros",
  "sea-query",
@@ -4082,7 +4092,7 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-cli"
-version = "1.1.5"
+version = "1.1.7"
 dependencies = [
  "chrono",
  "clap",
@@ -4090,6 +4100,8 @@ dependencies = [
  "glob",
  "regex",
  "sea-schema",
+ "serde",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
  "url",
@@ -4097,7 +4109,7 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-macros"
-version = "1.1.5"
+version = "1.1.7"
 dependencies = [
  "heck 0.4.1",
  "proc-macro-crate",
@@ -4110,12 +4122,11 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-migration"
-version = "1.1.5"
+version = "1.1.7"
 dependencies = [
  "async-trait",
  "clap",
  "dotenvy",
- "futures",
  "sea-orm",
  "sea-orm-cli",
  "sea-schema",
