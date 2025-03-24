@@ -280,8 +280,8 @@ impl EntityWriter {
                                     return None;
                                 }
                             }
-                            // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户
-                            if col.name == "creator" ||  col.name == "editor" ||  col.name == "editor_id"{
+                            // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户, 但是查询的时候还是需要
+                            if  (msg.starts_with("New") || msg.starts_with("Update")) && (col.name == "creator" ||  col.name == "editor" ||  col.name == "editor_id"){
                                 return None;
                             }
                             let proto_idx = entity_meta.entry(col.name.clone()).or_insert(idx + 1);
