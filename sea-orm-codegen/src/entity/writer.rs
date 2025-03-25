@@ -226,9 +226,17 @@ impl EntityWriter {
     ) -> WriterOutput {
         let mut files = Vec::new();
         let mut lines = Vec::with_capacity(1024);
+        let mut new_lines = Vec::with_capacity(1024);
+        let mut update_lines = Vec::with_capacity(1024);
         lines.push(r##"syntax = "proto3";"##.to_owned());
-        lines.push(r##"package proto.sea_orm_generate_table;"##.to_owned());
+        lines.push(r##"package proto.sea_orm_generate_table.query;"##.to_owned());
+        new_lines.push(r##"syntax = "proto3";"##.to_owned());
+        new_lines.push(r##"package proto.sea_orm_generate_table.new;"##.to_owned());
+        update_lines.push(r##"syntax = "proto3";"##.to_owned());
+        update_lines.push(r##"package proto.sea_orm_generate_table.update;"##.to_owned());
         lines.push("\n".to_string());
+        new_lines.push("\n".to_string());
+        update_lines.push("\n".to_string());
         let rust2proto_types_map: HashMap<&str, &str> = HashMap::from_iter(vec![
             ("f64", "double"),
             ("f32", "float"),
@@ -249,8 +257,7 @@ impl EntityWriter {
 
         self.entities
             .iter()
-            .map(|entity| {
-                let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
+            .for_each(|entity| {
                 let msg_name = entity.get_table_name_camel_case();
                 let mut all_msgs = vec![msg_name.clone()];
                 if entity.columns.iter().find(|col| col.name == "id").is_some() {
@@ -258,7 +265,10 @@ impl EntityWriter {
                     all_msgs.extend([format!("New{msg_name}"), format!("Update{msg_name}")]);
                 }
                 for msg in all_msgs {
+                    let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
                     entity_msg_lines.push(format!("message {msg}{{"));
+                    let is_new = msg .starts_with("New");
+                    let is_update = msg .starts_with("Update");
                     let entity_meta = meta.entry(msg.clone()).or_default();
                     entity_msg_lines.extend(entity.columns.iter().enumerate().filter_map(
                         |(idx, col)| {
@@ -269,7 +279,7 @@ impl EntityWriter {
 
                             if col_type.starts_with("DateTime")
                             {
-                                if (msg.starts_with("New") || msg.starts_with("Update"))
+                                if (is_new || is_update)
                                     && (col.name == "created_at"
                                     || col.name == "updated_at"
                                     || col.name == "deleted_at"){
@@ -281,7 +291,7 @@ impl EntityWriter {
                                 }
                             }
                             // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户, 但是查询的时候还是需要
-                            if  (msg.starts_with("New") || msg.starts_with("Update")) && (col.name == "creator" ||  col.name == "editor" ||  col.name == "editor_id"){
+                            if  (is_new || is_update) && (col.name == "creator" ||  col.name == "editor" ||  col.name == "editor_id"){
                                 return None;
                             }
                             let proto_idx = entity_meta.entry(col.name.clone()).or_insert(idx + 1);
@@ -302,15 +312,29 @@ impl EntityWriter {
                         },
                     ));
                     entity_msg_lines.push(format!("}}\n"));
+                    if is_new {
+                        new_lines.extend(entity_msg_lines);
+                    }else if is_update {
+                        update_lines.extend(entity_msg_lines);
+                    }else{
+                        lines.extend(entity_msg_lines);
+                    }
                 }
-                entity_msg_lines
-            })
-            .for_each(|entity_lines| {
-                lines.extend(entity_lines);
             });
+            // .for_each(|entity_lines| {
+            //     lines.extend(entity_lines);
+            // });
         files.push(OutputFile {
-            name: "generate_sea_orm.proto".to_string(),
+            name: "generate_sea_orm_query.proto".to_string(),
             content: lines.join("\n"),
+        });
+        files.push(OutputFile {
+            name: "generate_sea_orm_new.proto".to_string(),
+            content: new_lines.join("\n"),
+        });
+        files.push(OutputFile {
+            name: "generate_sea_orm_update.proto".to_string(),
+            content: update_lines.join("\n"),
         });
         WriterOutput { files }
     }
