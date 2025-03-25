@@ -295,12 +295,13 @@ impl EntityWriter {
                                 return None;
                             }
                             let proto_idx = entity_meta.entry(col.name.clone()).or_insert(idx + 1);
+                            let optional = if col.not_null {""}else{"optional "};
                             if col_type.starts_with("Vec<") {
-                                Some(format!("    bytes {} = {};", col.name, *proto_idx))
+                                Some(format!("    {optional}bytes {} = {};", col.name, *proto_idx))
                             } else {
                                 match rust2proto_types_map.get(col_type.as_str()) {
                                     Some(proto_type) => Some(format!(
-                                        "    {proto_type} {} = {};",
+                                        "    {optional}{proto_type} {} = {};",
                                         col.name, *proto_idx
                                     )),
                                     None => {
