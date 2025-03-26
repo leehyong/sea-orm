@@ -293,7 +293,8 @@ impl EntityWriter {
                         if (is_new || is_update)
                             && (col.name == "creator"
                                 || col.name == "editor"
-                                || col.name == "editor_id")
+                                || col.name == "editor_id"
+                                || col.name == "id")
                         {
                             return None;
                         }
