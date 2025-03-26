@@ -223,7 +223,7 @@ impl EntityWriter {
     pub fn generate_proto(
         &self,
         context: &EntityWriterContext,
-        meta: &mut HashMap<String, HashMap<String, usize>>,
+        meta: &mut BTreeMap<String, BTreeMap<String, usize>>,
     ) -> WriterOutput {
         let mut files = Vec::new();
         let mut lines = Vec::with_capacity(1024);

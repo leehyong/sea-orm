@@ -7,7 +7,10 @@ use std::io::Read;
 use std::{error::Error, fs, io::Write, path::Path, process::Command, str::FromStr};
 use tracing_subscriber::{prelude::*, EnvFilter};
 use url::Url;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
+use sea_schema::mysql::MySql;
+use sea_schema::postgres::Postgres;
+use sea_schema::sqlite::Sqlite;
 use crate::{DateTimeCrate, GenerateSubcommands};
 
 pub async fn run_generate_command(
@@ -228,9 +231,9 @@ pub async fn run_generate_command(
                     file.read_to_string(&mut contents)?;
                 }
                 // 读取文件内容到字符串
-                let mut meta:HashMap<String, HashMap<String, usize>>;
+                let mut meta:BTreeMap<String, BTreeMap<String, usize>>;
                 if contents.is_empty(){
-                    meta = HashMap::new();
+                    meta = BTreeMap::new();
                 }else{
                     meta = serde_json::from_str(contents.as_str()).unwrap();
                 }
