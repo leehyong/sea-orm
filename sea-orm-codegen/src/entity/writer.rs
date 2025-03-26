@@ -3,6 +3,7 @@ use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
+use std::ptr::replace;
 use std::{collections::BTreeMap, str::FromStr};
 use syn::{punctuated::Punctuated, token::Comma};
 use tracing::info;
@@ -255,76 +256,80 @@ impl EntityWriter {
             ("DateTimeWithTimeZone", "string"),
         ]);
 
-        self.entities
-            .iter()
-            .for_each(|entity| {
-                let msg_name = entity.get_table_name_camel_case();
-                let mut all_msgs = vec![msg_name.clone()];
-                if entity.columns.iter().find(|col| col.name == "id").is_some() {
-                    // 如存在ID列，则此数据库表可以额外创建新增、修改两个message
-                    all_msgs.extend([format!("New{msg_name}"), format!("Update{msg_name}")]);
-                }
-                for msg in all_msgs {
-                    let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
-                    entity_msg_lines.push(format!("message {msg}{{"));
-                    let is_new = msg .starts_with("New");
-                    let is_update = msg .starts_with("Update");
-                    let entity_meta = meta.entry(msg.clone()).or_default();
-                    entity_msg_lines.extend(entity.columns.iter().enumerate().filter_map(
-                        |(idx, col)| {
-                            let col_type = col
-                                .get_rs_type_no_option(&context.date_time_crate)
-                                .to_string()
-                                .replace(' ', "");
+        self.entities.iter().for_each(|entity| {
+            let msg_name = entity.get_table_name_camel_case();
+            let mut all_msgs = vec![msg_name.clone()];
+            if entity.columns.iter().find(|col| col.name == "id").is_some() {
+                // 如存在ID列，则此数据库表可以额外创建新增、修改两个message
+                all_msgs.extend([format!("New{msg_name}"), format!("Update{msg_name}")]);
+            }
+            for msg in all_msgs {
+                let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
+                entity_msg_lines.push(format!("message {msg}{{"));
+                let is_new = msg.starts_with("New");
+                let is_update = msg.starts_with("Update");
+                let entity_meta = meta.entry(msg.clone()).or_default();
+                entity_msg_lines.extend(entity.columns.iter().enumerate().filter_map(
+                    |(idx, col)| {
+                        let mut col_type = col
+                            .get_rs_type_no_option(&context.date_time_crate)
+                            .to_string()
+                            .replace(' ', "");
 
-                            if col_type.starts_with("DateTime")
-                            {
-                                if (is_new || is_update)
-                                    && (col.name == "created_at"
+                        if col_type.starts_with("DateTime") {
+                            if (is_new || is_update)
+                                && (col.name == "created_at"
                                     || col.name == "updated_at"
-                                    || col.name == "deleted_at"){
-                                    // 这几个字段不需要写到proto文件中
-                                    return None;
-                                } else if col.name == "deleted_at" {
-                                    // 这个字段不需要写到proto文件中
-                                    return None;
-                                }
-                            }
-                            // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户, 但是查询的时候还是需要
-                            if  (is_new || is_update) && (col.name == "creator" ||  col.name == "editor" ||  col.name == "editor_id"){
+                                    || col.name == "deleted_at")
+                            {
+                                // 这几个字段不需要写到proto文件中
+                                return None;
+                            } else if col.name == "deleted_at" {
+                                // 这个字段不需要写到proto文件中
                                 return None;
                             }
-                            let proto_idx = entity_meta.entry(col.name.clone()).or_insert(idx + 1);
-                            let optional = if col.not_null {""}else{"optional "};
-                            if col_type.starts_with("Vec<") {
-                                Some(format!("    {optional}bytes {} = {};", col.name, *proto_idx))
-                            } else {
-                                match rust2proto_types_map.get(col_type.as_str()) {
-                                    Some(proto_type) => Some(format!(
-                                        "    {optional}{proto_type} {} = {};",
-                                        col.name, *proto_idx
-                                    )),
-                                    None => {
-                                        eprintln!("不支持的类型{col_type}");
-                                        None
-                                    }
-                                }
+                        }
+                        // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户, 但是查询的时候还是需要
+                        if (is_new || is_update)
+                            && (col.name == "creator"
+                                || col.name == "editor"
+                                || col.name == "editor_id")
+                        {
+                            return None;
+                        }
+                        let proto_idx = entity_meta.entry(col.name.clone()).or_insert(idx + 1);
+                        let optional = if col.not_null { "" } else { "optional " };
+                        let repeated = if col_type.starts_with("Vec<") {
+                            col_type = col_type.replace("Vec<", "").replace(">", "");
+                            "repeated "
+                        } else {
+                            ""
+                        };
+                        match rust2proto_types_map.get(col_type.as_str()) {
+                            Some(proto_type) => Some(format!(
+                                "    {optional}{repeated}{proto_type} {} = {};",
+                                col.name, *proto_idx
+                            )),
+                            None => {
+                                eprintln!("不支持的类型{}", col.name.as_str());
+                                None
                             }
-                        },
-                    ));
-                    entity_msg_lines.push(format!("}}\n"));
-                    if is_new {
-                        new_lines.extend(entity_msg_lines);
-                    }else if is_update {
-                        update_lines.extend(entity_msg_lines);
-                    }else{
-                        lines.extend(entity_msg_lines);
-                    }
+                        }
+                    },
+                ));
+                entity_msg_lines.push(format!("}}\n"));
+                if is_new {
+                    new_lines.extend(entity_msg_lines);
+                } else if is_update {
+                    update_lines.extend(entity_msg_lines);
+                } else {
+                    lines.extend(entity_msg_lines);
                 }
-            });
-            // .for_each(|entity_lines| {
-            //     lines.extend(entity_lines);
-            // });
+            }
+        });
+        // .for_each(|entity_lines| {
+        //     lines.extend(entity_lines);
+        // });
         files.push(OutputFile {
             name: "generate_sea_orm_query.proto".to_string(),
             content: lines.join("\n"),
