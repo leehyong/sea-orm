@@ -755,6 +755,42 @@ impl_into_active_value!(crate::prelude::TimeDateTime);
 #[cfg_attr(docsrs, doc(cfg(feature = "with-time")))]
 impl_into_active_value!(crate::prelude::TimeDateTimeWithTimeZone);
 
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<i8>);
+
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<i16>);
+
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<i32>);
+
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<i64>);
+
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<bool>);
+
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<u16>);
+
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<u32>);
+
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<u64>);
+
+#[cfg(feature = "postgres-array")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres-array")))]
+impl_into_active_value!(Vec::<String>);
+
 #[cfg(feature = "with-ipnetwork")]
 #[cfg_attr(docsrs, doc(cfg(feature = "with-ipnetwork")))]
 impl_into_active_value!(crate::prelude::IpNetwork);
