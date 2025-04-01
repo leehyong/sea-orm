@@ -276,25 +276,14 @@ impl EntityWriter {
                             .to_string()
                             .replace(' ', "");
 
-                        if col_type.starts_with("DateTime") {
-                            if (is_new || is_update)
-                                && (col.name == "created_at"
-                                    || col.name == "updated_at"
-                                    || col.name == "deleted_at")
-                            {
-                                // 这几个字段不需要写到proto文件中
-                                return None;
-                            } else if col.name == "deleted_at" {
-                                // 这个字段不需要写到proto文件中
-                                return None;
-                            }
+                        if ["deleted_at", "left", "right", "tag", "level"].contains(&col.name.as_str()) {
+                            // 这个字段不需要写到proto文件中
+                            return None;
                         }
                         // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户, 但是查询的时候还是需要
-                        if (is_new || is_update)
-                            && (col.name == "creator"
-                                || col.name == "editor"
-                                || col.name == "editor_id"
-                                || col.name == "id")
+                        else if (is_new || is_update)
+                            && ["creator", "editor", "id", "created_at", "updated_at"]
+                                .contains(&col.name.as_str())
                         {
                             return None;
                         }
