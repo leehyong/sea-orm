@@ -226,6 +226,13 @@ pub enum GenerateSubcommands {
         proto_dir: String,
 
         #[arg(
+            long,
+            default_value = "",
+            help = "http api file output directory"
+        )]
+        crud_dir: String,
+
+        #[arg(
             short = 's',
             long,
             env = "DATABASE_SCHEMA",

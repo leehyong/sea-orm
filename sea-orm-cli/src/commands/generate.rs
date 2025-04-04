@@ -1,17 +1,17 @@
+use crate::{DateTimeCrate, GenerateSubcommands};
 use core::time;
 use sea_orm_codegen::{
     DateTimeCrate as CodegenDateTimeCrate, EntityTransformer, EntityWriterContext, OutputFile,
     WithPrelude, WithSerde,
 };
+use sea_schema::mysql::MySql;
+use sea_schema::postgres::Postgres;
+use sea_schema::sqlite::Sqlite;
+use std::collections::BTreeMap;
 use std::io::Read;
 use std::{error::Error, fs, io::Write, path::Path, process::Command, str::FromStr};
 use tracing_subscriber::{prelude::*, EnvFilter};
 use url::Url;
-use std::collections::BTreeMap;
-use sea_schema::mysql::MySql;
-use sea_schema::postgres::Postgres;
-use sea_schema::sqlite::Sqlite;
-use crate::{DateTimeCrate, GenerateSubcommands};
 
 pub async fn run_generate_command(
     command: GenerateSubcommands,
@@ -28,6 +28,7 @@ pub async fn run_generate_command(
             acquire_timeout,
             output_dir,
             proto_dir,
+            crud_dir,
             database_schema,
             database_url,
             with_prelude,
@@ -249,6 +250,18 @@ pub async fn run_generate_command(
                     file.write_all(serde_json::to_string(&meta).unwrap().as_bytes())?;
                 }
             }
+
+            if !crud_dir.is_empty(){
+                let dir = Path::new(&crud_dir);
+                fs::create_dir_all(dir)?;
+                let output = entity_writer.generate_derive_auto_simple_curd_api(&writer_context);
+                for OutputFile { name, content } in output.files.iter(){
+                    let file_path = dir.join(name);
+                    println!("Writing {}", file_path.display());
+                    let mut file = fs::File::create(file_path)?;
+                    file.write_all(content.as_bytes())?;
+                }
+            }
             let output = entity_writer.generate(&writer_context);
             let dir = Path::new(&output_dir);
             fs::create_dir_all(dir)?;
@@ -321,7 +334,6 @@ impl From<DateTimeCrate> for CodegenDateTimeCrate {
 mod tests {
     use clap::Parser;
 
-    use super::*;
     use crate::{Cli, Commands};
 
     #[test]
