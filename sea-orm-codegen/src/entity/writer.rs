@@ -1,5 +1,5 @@
 use crate::{util::escape_rust_keyword, ActiveEnum, Entity};
-use heck::ToUpperCamelCase;
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
@@ -344,17 +344,16 @@ impl EntityWriter {
         let mut lines = Vec::with_capacity(1024);
         lines.push(r##"use cus_marco::DeriveCusAutoSimpleCrudIeApi;"##.to_owned());
         lines.push("\n".to_owned());
-        lines.push(r##"/// 简单的数据库表的操作,格式如下:"##.to_owned());
-        lines.push("///\tGET 查询全部  /表名/all".to_owned());
-        lines.push("///\tPOST 新增数据 /表名".to_owned());
-        lines.push("///\tPUT  修改数据 /表名".to_owned());
-        lines.push("///\tDELETE 删除某条数据 /表名/:id".to_owned());
-        lines.push("\n".to_owned());
         // 只自动创建那种有id列的表
         self.entities.iter().filter(|entity|entity.columns.iter().find(|col| col.name == "id").is_some())
             .for_each(|entity| {
             let table = entity.get_table_name_camel_case();
             lines.extend([
+                format!("/// 简单的数据库表{}的http crud操作,格式如下:", table.to_snake_case()),
+                format!("///\tGET 查询全部  {{API_CONTEXT_PATH}}/{}/all ， 需要用户具有query权限", table.to_snake_case()),
+                format!("///\tPOST 新增数据  {{API_CONTEXT_PATH}}/{} ， 需要用户具有new权限 ", table.to_snake_case()),
+                format!("///\tPUT  修改数据  {{API_CONTEXT_PATH}}/{} ，  需要用户具有put权限", table.to_snake_case()),
+                format!("///\tDELETE 删除某条数据  {{API_CONTEXT_PATH}}/{}/:id， 需要用户具有delete权限 ", table.to_snake_case()),
                 "#[derive(DeriveCusAutoSimpleCrudIeApi)]".to_string(),
                 format!("struct {table}AutoSimpleCrudIeApi;\n"),
             ]);
