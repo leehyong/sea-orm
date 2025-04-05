@@ -276,7 +276,9 @@ impl EntityWriter {
                             .to_string()
                             .replace(' ', "");
 
-                        if ["deleted_at", "left", "right", "tag", "level"].contains(&col.name.as_str()) {
+                        if ["deleted_at", "left", "right", "tag", "level"]
+                            .contains(&col.name.as_str())
+                        {
                             // 这个字段不需要写到proto文件中
                             return None;
                         }
@@ -338,6 +340,7 @@ impl EntityWriter {
     pub fn generate_derive_auto_simple_curd_api(
         &self,
         context: &EntityWriterContext,
+        table_validate_map: &HashMap<String, String>,
         // meta: &mut BTreeMap<String, BTreeMap<String, usize>>,
     ) -> WriterOutput {
         let mut files = Vec::new();
@@ -345,19 +348,26 @@ impl EntityWriter {
         lines.push(r##"use cus_marco::DeriveCusAutoSimpleCrudIeApi;"##.to_owned());
         lines.push("\n".to_owned());
         // 只自动创建那种有id列的表
-        self.entities.iter().filter(|entity|entity.columns.iter().find(|col| col.name == "id").is_some())
+        self.entities.iter().filter(|entity| entity.columns.iter().find(|col| col.name == "id").is_some())
             .for_each(|entity| {
-            let table = entity.get_table_name_camel_case();
-            lines.extend([
-                format!("/// 简单的数据库表{}的http crud操作,格式如下:", table.to_snake_case()),
-                format!("///\tGET 查询全部  {{API_CONTEXT_PATH}}/{}/all ， 需要用户具有query权限", table.to_snake_case()),
-                format!("///\tPOST 新增数据  {{API_CONTEXT_PATH}}/{} ， 需要用户具有new权限 ", table.to_snake_case()),
-                format!("///\tPUT  修改数据  {{API_CONTEXT_PATH}}/{} ，  需要用户具有put权限", table.to_snake_case()),
-                format!("///\tDELETE 删除某条数据  {{API_CONTEXT_PATH}}/{}/:id， 需要用户具有delete权限 ", table.to_snake_case()),
-                "#[derive(DeriveCusAutoSimpleCrudIeApi)]".to_string(),
-                format!("struct {table}AutoSimpleCrudIeApi;\n"),
-            ]);
-        });
+                let table = entity.get_table_name_camel_case();
+                lines.extend([
+                    format!("/// 简单的数据库表{}的http crud操作,格式如下:", table.to_snake_case()),
+                    format!("///\tGET 查询全部  {{API_CONTEXT_PATH}}/{}/all ， 需要用户具有query权限", table.to_snake_case()),
+                    format!("///\tPOST 新增数据  {{API_CONTEXT_PATH}}/{} ， 需要用户具有new权限 ", table.to_snake_case()),
+                    format!("///\tPUT  修改数据  {{API_CONTEXT_PATH}}/{} ，  需要用户具有update权限", table.to_snake_case()),
+                    format!("///\tDELETE 删除某条数据  {{API_CONTEXT_PATH}}/{}/:id， 需要用户具有delete权限 ", table.to_snake_case()),
+                    "#[derive(DeriveCusAutoSimpleCrudIeApi)]".to_string()
+                ]);
+                if let Some(p)  = table_validate_map.get( table.to_snake_case().as_str() ) {
+                    let p = p.trim();
+                    if !p.is_empty() {
+                        // 添加专门验证的宏
+                        lines.push(format!("#[yxt=(validate=\"{p}\")]"));
+                    }
+                }
+                lines.push(format!("struct {table}AutoSimpleCrudIeApi;\n"));
+            });
         // .for_each(|entity_lines| {
         //     lines.extend(entity_lines);
         // });

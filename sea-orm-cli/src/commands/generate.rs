@@ -7,7 +7,7 @@ use sea_orm_codegen::{
 use sea_schema::mysql::MySql;
 use sea_schema::postgres::Postgres;
 use sea_schema::sqlite::Sqlite;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
 use std::{error::Error, fs, io::Write, path::Path, process::Command, str::FromStr};
 use tracing_subscriber::{prelude::*, EnvFilter};
@@ -218,44 +218,58 @@ pub async fn run_generate_command(
             );
             let entity_writer = EntityTransformer::transform(table_stmts)?;
 
-            if !proto_dir.is_empty(){
+            if !proto_dir.is_empty() {
                 let dir = Path::new(&proto_dir);
                 fs::create_dir_all(dir)?;
                 // 通过 这个json 文件以保证 生成的proto文件的字段值不变化
                 let meta_json_file_path = dir.join("generated.meta.json");
                 // 打开文件
-                
+
                 // 创建一个字符串变量来存储文件内容
                 let mut contents = String::new();
-                if fs::exists(&meta_json_file_path).unwrap(){
+                if fs::exists(&meta_json_file_path).unwrap() {
                     let mut file = fs::File::open(&meta_json_file_path)?;
                     file.read_to_string(&mut contents)?;
                 }
                 // 读取文件内容到字符串
-                let mut meta:BTreeMap<String, BTreeMap<String, usize>>;
-                if contents.is_empty(){
+                let mut meta: BTreeMap<String, BTreeMap<String, usize>>;
+                if contents.is_empty() {
                     meta = BTreeMap::new();
-                }else{
+                } else {
                     meta = serde_json::from_str(contents.as_str()).unwrap();
                 }
                 let output = entity_writer.generate_proto(&writer_context, &mut meta);
-                for OutputFile { name, content } in output.files.iter(){
+                for OutputFile { name, content } in output.files.iter() {
                     let file_path = dir.join(name);
                     println!("Writing {}", file_path.display());
                     let mut file = fs::File::create(file_path)?;
                     file.write_all(content.as_bytes())?;
                 }
-                if !meta.is_empty(){
+                if !meta.is_empty() {
                     let mut file = fs::File::create(meta_json_file_path)?;
                     file.write_all(serde_json::to_string(&meta).unwrap().as_bytes())?;
                 }
             }
 
-            if !crud_dir.is_empty(){
+            if !crud_dir.is_empty() {
                 let dir = Path::new(&crud_dir);
                 fs::create_dir_all(dir)?;
-                let output = entity_writer.generate_derive_auto_simple_curd_api(&writer_context);
-                for OutputFile { name, content } in output.files.iter(){
+                let table_validate_json_path = dir.join("table_crud_validate.json");
+                let mut table_validate_map: HashMap<String, String> = HashMap::new();
+                println!("table_crud_validate.json:{}", table_validate_json_path.display());
+                if fs::exists(&table_validate_json_path).unwrap() {
+                    let mut table_validate_json_file = fs::File::open(&table_validate_json_path)?;
+                    let mut contents = String::new();
+                    table_validate_json_file.read_to_string(&mut contents)?;
+                    if !contents.is_empty() {
+                        table_validate_map = serde_json::from_str(contents.as_str()).unwrap();
+                        println!("{}", contents);
+                    }
+
+                }
+                let output = entity_writer
+                    .generate_derive_auto_simple_curd_api(&writer_context, &table_validate_map);
+                for OutputFile { name, content } in output.files.iter() {
                     let file_path = dir.join(name);
                     println!("Writing {}", file_path.display());
                     let mut file = fs::File::create(file_path)?;
@@ -266,8 +280,7 @@ pub async fn run_generate_command(
             let dir = Path::new(&output_dir);
             fs::create_dir_all(dir)?;
 
-            
-            for OutputFile { name, content } in output.files.iter(){
+            for OutputFile { name, content } in output.files.iter() {
                 let file_path = dir.join(name);
                 println!("Writing {}", file_path.display());
                 let mut file = fs::File::create(file_path)?;
@@ -282,8 +295,6 @@ pub async fn run_generate_command(
                     return Err(format!("Fail to format file `{name}`").into());
                 }
             }
-
-            
 
             println!("... Done.");
         }
