@@ -346,6 +346,7 @@ impl EntityWriter {
         let mut files = Vec::new();
         let mut lines = Vec::with_capacity(1024);
         lines.push(r##"use cus_marco::DeriveCusAutoSimpleCrudIeApi;"##.to_owned());
+        lines.push(r##"use super::*;"##.to_owned());
         lines.push("\n".to_owned());
         // 只自动创建那种有id列的表
         self.entities.iter().filter(|entity| entity.columns.iter().find(|col| col.name == "id").is_some())
@@ -361,9 +362,12 @@ impl EntityWriter {
                 ]);
                 if let Some(p)  = table_validate_map.get( table.to_snake_case().as_str() ) {
                     let p = p.trim();
-                    if !p.is_empty() {
+                    if p.is_empty() {
+                        // 空字符串的话，使用默认的验证器
                         // 添加专门验证的宏
-                        lines.push(format!("#[yxt=(validate=\"{p}\")]"));
+                        lines.push("#[yxt(validator)]".to_string());
+                    }else{
+                        lines.push(format!("#[yxt(validator=\"{p}\")]"));
                     }
                 }
                 lines.push(format!("struct {table}AutoSimpleCrudIeApi;\n"));
