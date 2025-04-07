@@ -336,16 +336,12 @@ impl EntityWriter {
         });
         WriterOutput { files }
     }
-
-    pub fn generate_tree_view_tables(
+    fn lr_tree_tables(
         &self,
-        context: &EntityWriterContext,
         // meta: &mut BTreeMap<String, BTreeMap<String, usize>>,
-    ) -> WriterOutput {
-        let mut files = Vec::new();
+    ) -> Vec<String> {
         let tree_fields = ["right", "left", "level", "tag"];
-        let tree_tables = self
-            .entities
+        self.entities
             .iter()
             .filter(|entity| {
                 entity
@@ -356,10 +352,17 @@ impl EntityWriter {
                     == tree_fields.len()
             })
             .map(|entity| entity.get_table_name_camel_case().to_snake_case())
-            .collect::<Vec<_>>().join(",");
+            .collect::<Vec<_>>()
+    }
+    pub fn generate_tree_view_tables(
+        &self,
+        context: &EntityWriterContext,
+        // meta: &mut BTreeMap<String, BTreeMap<String, usize>>,
+    ) -> WriterOutput {
+        let mut files = Vec::new();
         files.push(OutputFile {
             name: "left_right_tree_tables.txt".to_string(),
-            content: tree_tables,
+            content: self.lr_tree_tables().join(","),
         });
         WriterOutput { files }
     }
@@ -374,18 +377,32 @@ impl EntityWriter {
         lines.push(r##"use cus_marco::DeriveCusAutoSimpleCrudIeApi;"##.to_owned());
         lines.push(r##"use super::*;"##.to_owned());
         lines.push("\n".to_owned());
+        let lrt_tables = self.lr_tree_tables();
         // 只自动创建那种有id列的表
         self.entities.iter().filter(|entity| entity.columns.iter().find(|col| col.name == "id").is_some())
             .for_each(|entity| {
                 let table = entity.get_table_name_camel_case();
+                let is_lrt = lrt_tables.contains(&table.to_snake_case());
+                let insert_query = if is_lrt {
+                    "?parent_id=1122"
+                }else{
+                  ""
+                };
                 lines.extend([
-                    format!("/// 简单的数据库表{}的http crud操作,格式如下:", table.to_snake_case()),
+                    format!("///简单的数据库表{}的http crud操作,格式如下:", table.to_snake_case()),
                     format!("///\tGET 查询全部  {{API_CONTEXT_PATH}}/{}/all ， 需要用户具有query权限", table.to_snake_case()),
-                    format!("///\tPOST 新增数据  {{API_CONTEXT_PATH}}/{} ， 需要用户具有new权限 ", table.to_snake_case()),
+                    format!("///\tPOST 新增数据  {{API_CONTEXT_PATH}}/{}{} ， 需要用户具有new权限 ", table.to_snake_case(), insert_query),
                     format!("///\tPUT  修改数据  {{API_CONTEXT_PATH}}/{} ，  需要用户具有update权限", table.to_snake_case()),
                     format!("///\tDELETE 删除某条数据  {{API_CONTEXT_PATH}}/{}/:id， 需要用户具有delete权限 ", table.to_snake_case()),
-                    "#[derive(DeriveCusAutoSimpleCrudIeApi)]".to_string()
                 ]);
+                if is_lrt {
+                    lines.extend([
+                        "///基于左右值编码的表还有以下额外接口:".to_string(),
+                        format!("///\tGET 查询根节点  {{API_CONTEXT_PATH}}/{}/root ， 需要用户具有query权限", table.to_snake_case()),
+                        format!("///\tGET 查询儿子节点或者所有子节点  {{API_CONTEXT_PATH}}/{}/root?parent_id=xx&&only_sons=true|false ， 需要用户具有query权限", table.to_snake_case()),
+                    ]);
+                }
+                lines.push("#[derive(DeriveCusAutoSimpleCrudIeApi)]".to_string());
                 if let Some(p)  = table_validate_map.get( table.to_snake_case().as_str() ) {
                     let p = p.trim();
                     if p.is_empty() {
@@ -396,6 +413,7 @@ impl EntityWriter {
                         lines.push(format!("#[yxt(validator=\"{p}\")]"));
                     }
                 }
+
                 lines.push(format!("struct {table}AutoSimpleCrudIeApi;\n"));
             });
         // .for_each(|entity_lines| {
