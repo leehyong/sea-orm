@@ -337,6 +337,32 @@ impl EntityWriter {
         WriterOutput { files }
     }
 
+    pub fn generate_tree_view_tables(
+        &self,
+        context: &EntityWriterContext,
+        // meta: &mut BTreeMap<String, BTreeMap<String, usize>>,
+    ) -> WriterOutput {
+        let mut files = Vec::new();
+        let tree_fields = ["right", "left", "level", "tag"];
+        let tree_tables = self
+            .entities
+            .iter()
+            .filter(|entity| {
+                entity
+                    .columns
+                    .iter()
+                    .filter(|col| tree_fields.contains(&col.name.as_str()))
+                    .count()
+                    == tree_fields.len()
+            })
+            .map(|entity| entity.get_table_name_camel_case().to_snake_case())
+            .collect::<Vec<_>>().join(",");
+        files.push(OutputFile {
+            name: "left_right_tree_tables.txt".to_string(),
+            content: tree_tables,
+        });
+        WriterOutput { files }
+    }
     pub fn generate_derive_auto_simple_curd_api(
         &self,
         context: &EntityWriterContext,

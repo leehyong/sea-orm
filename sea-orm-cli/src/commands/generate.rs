@@ -275,6 +275,15 @@ pub async fn run_generate_command(
                     let mut file = fs::File::create(file_path)?;
                     file.write_all(content.as_bytes())?;
                 }
+
+                // 输出那些使用左右值编码的表
+                for OutputFile { name, content } in entity_writer
+                    .generate_tree_view_tables(&writer_context).files.iter() {
+                    let file_path = dir.join(name);
+                    println!("Writing {}", file_path.display());
+                    let mut file = fs::File::create(file_path)?;
+                    file.write_all(content.as_bytes())?;
+                }
             }
             let output = entity_writer.generate(&writer_context);
             let dir = Path::new(&output_dir);
