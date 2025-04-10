@@ -259,10 +259,9 @@ impl EntityWriter {
         self.entities.iter().for_each(|entity| {
             let msg_name = entity.get_table_name_camel_case();
             let mut all_msgs = vec![msg_name.clone()];
-            if entity.columns.iter().find(|col| col.name == "id").is_some() {
-                // 如存在ID列，则此数据库表可以额外创建新增、修改两个message
-                all_msgs.extend([format!("New{msg_name}"), format!("Update{msg_name}")]);
-            }
+            // 以额外创建新增、修改两个message
+            all_msgs.extend([format!("New{msg_name}"), format!("Update{msg_name}")]);
+
             for msg in all_msgs {
                 let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
                 entity_msg_lines.push(format!("message {msg}{{"));
@@ -276,16 +275,25 @@ impl EntityWriter {
                             .to_string()
                             .replace(' ', "");
 
-                        if ["deleted_at", "left", "right", "tag", "level"]
-                            .contains(&col.name.as_str())
-                        {
-                            // 这个字段不需要写到proto文件中
+                        // if ["deleted_at", "left", "right", "tag", "level"]
+                        if ["deleted_at", "tag"].contains(&col.name.as_str()) {
+                            // 这些字段不需要写到proto文件中
                             return None;
                         }
                         // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户, 但是查询的时候还是需要
                         else if (is_new || is_update)
-                            && ["creator", "editor", "id", "created_at", "updated_at"]
-                                .contains(&col.name.as_str())
+                            && [
+                                "creator",
+                                "editor",
+                                "id",
+                                "created_at",
+                                "updated_at",
+                                "left",
+                                "right",
+                                "tag",
+                                "level",
+                            ]
+                            .contains(&col.name.as_str())
                         {
                             return None;
                         }
