@@ -239,6 +239,11 @@ impl EntityWriter {
         new_lines.push("\n".to_string());
         update_lines.push("\n".to_string());
         let rust2proto_types_map: HashMap<&str, &str> = HashMap::from_iter(vec![
+            ("Decimal", "string"),
+            ("i16", "int32"),
+            ("u16", "uint32"),
+            ("i8", "int32"),
+            ("u8", "uint32"),
             ("f64", "double"),
             ("f32", "float"),
             ("i32", "int32"),
