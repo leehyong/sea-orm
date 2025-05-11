@@ -282,12 +282,7 @@ impl EntityWriter {
 
                         // if ["deleted_at", "left", "right", "tag", "level"]
                         // if ["deleted_at", "tag"].contains(&col.name.as_str()) {
-                        if ["deleted_at", ].contains(&col.name.as_str()) {
-                            // 这些字段不需要写到proto文件中
-                            return None;
-                        }
-                        // 这几个也不需要写进去， 因为可以从jwt 里获取到每次的操作用户, 但是查询的时候还是需要
-                        else if (is_new || is_update)
+                        if (is_new || is_update)
                             && [
                                 "creator",
                                 "editor",
