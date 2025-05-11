@@ -281,7 +281,8 @@ impl EntityWriter {
                             .replace(' ', "");
 
                         // if ["deleted_at", "left", "right", "tag", "level"]
-                        if ["deleted_at", "tag"].contains(&col.name.as_str()) {
+                        // if ["deleted_at", "tag"].contains(&col.name.as_str()) {
+                        if ["deleted_at", ].contains(&col.name.as_str()) {
                             // 这些字段不需要写到proto文件中
                             return None;
                         }
