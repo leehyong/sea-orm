@@ -264,8 +264,12 @@ impl EntityWriter {
         self.entities.iter().for_each(|entity| {
             let msg_name = entity.get_table_name_camel_case();
             let mut all_msgs = vec![msg_name.clone()];
-            // 以额外创建新增、修改两个message
-            all_msgs.extend([format!("New{msg_name}"), format!("Update{msg_name}")]);
+
+            // 不需要写到 proto 文件中
+            if msg_name != "User" {
+                // 额外创建新增、修改两个message类
+                all_msgs.extend([format!("New{msg_name}"), format!("Update{msg_name}")]);
+            }
 
             for msg in all_msgs {
                 let mut entity_msg_lines = Vec::with_capacity(entity.columns.len());
@@ -280,10 +284,10 @@ impl EntityWriter {
                             .to_string()
                             .replace(' ', "");
 
-                        // if ["deleted_at", "left", "right", "tag", "level"]
-                        // if ["deleted_at", "tag"].contains(&col.name.as_str()) {
-                        if (is_new || is_update)
-                            && [
+                        if ["password", "deleted_at"].contains(&col.name.as_str()) {
+                            return None;
+                        } else if (is_new || is_update)
+                            && ([
                                 "creator",
                                 "editor",
                                 "id",
@@ -294,7 +298,7 @@ impl EntityWriter {
                                 "tag",
                                 "level",
                             ]
-                            .contains(&col.name.as_str())
+                            .contains(&col.name.as_str()))
                         {
                             return None;
                         }
