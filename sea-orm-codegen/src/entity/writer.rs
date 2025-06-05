@@ -432,10 +432,10 @@ impl EntityWriter {
         // .for_each(|entity_lines| {
         //     lines.extend(entity_lines);
         // });
-        files.push(OutputFile {
-            name: "generate_crud_ie.rs".to_string(),
-            content: lines.join("\n"),
-        });
+        // files.push(OutputFile {
+        //     name: "generate_crud_ie.rs".to_string(),
+        //     content: lines.join("\n"),
+        // });
 
         WriterOutput { files }
     }
