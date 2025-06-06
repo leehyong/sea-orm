@@ -258,6 +258,7 @@ impl EntityWriter {
             ("i64", "sfixed64"),
             ("bool", "bool"),
             ("String", "string"),
+            ("Json", "string"),
             ("DateTimeWithTimeZone", "string"),
         ]);
 
